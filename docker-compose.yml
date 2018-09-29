@@ -1,0 +1,35 @@
+version: "3"
+services:
+  client:
+    build:
+      context: ./
+      dockerfile: ./docker/client/Dockerfile
+    image: morais/farmers-market:latest
+    depends_on:
+      - api
+  api:
+    build:
+      context: ./
+      dockerfile: ./docker/api/Dockerfile
+    image: morais/farmers-market:latest
+    depends_on:
+      - mysql
+      - redis
+  mysql:
+    image: "mysql:5.7"
+    environment:
+      MYSQL_ROOT_PASSWORD: "password"
+      MYSQL_DATABASE: "market"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-ppassword", "--silent"]
+      interval: 5s
+    ports:
+      - 3306:3306
+  redis:
+    image: "redis:alpine"
+  tests:
+    build: .
+    image: morais/farmers-market:latest
+    depends_on:
+      - mysql
+    command: python -m pytest
