@@ -31,20 +31,31 @@ This application depends on Docker, so I will assume it is already installed, an
 
 The CLI provides an input interface for creating carts and producing itemized results, much like a test client.
 
-> `docker-compose up client`
+> `docker-compose build client`
+> `docker-compose run client`
+
+You will be given a command prompt with which to interact with the API, i.e. ...
 
 ```text
-TODO
+Commands:
+   action : description
+   ....
+
+>>> CH1, AP1
 ```
 
 ### Run the API standalone
 
-> `docker-compose up api`
+> `docker-compose up --build api`
 
  todo: show how to use curl to test against the API
 
 ### Run Tests
 
-Tests may be executed using docker-compose
+Tests may be executed using docker-compose, as well.
 
-> `docker-compose up --build tests`
+client tests:
+> `docker-compose up --build client-tests`
+
+API tests:
+> `docker-compose up --build api-tests`

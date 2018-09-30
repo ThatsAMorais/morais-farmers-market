@@ -276,6 +276,12 @@ These are updates or additional comments about the design added afterward...
 ----
 Always room to improve...
 
+### Better UX
+
+A proper frontend, such as an application or web view, would be more fluid for the customer amounting to greater sales, and likely the most valuable return on investment.
+
+For this Flask API one could follow the pack and use Jinja 2 to render data from the backend in HTML, but since the interface is HTTP it could be almost any popular frontend technology.
+
 ### Better Data Management
 
 The technical knowledge required to operate the system could be decreased if better management tools were provided for adding new specials, modifying products, etc.
@@ -283,3 +289,17 @@ The technical knowledge required to operate the system could be decreased if bet
 ### Specials Microservice
 
 Breaking out the coupons/specials to a micro-service, which I might like to write in Go, would allow for the gritty details of parsing and 3rd party noise to be extracted from the otherwise straight-forward API layer.
+
+### Live prediction
+
+While typing, the CLI could interpret each key-press and produce a real-time response, such as predicting what the user may be typing.
+
+### API-side caching
+
+Caching to avoid database calls can be beneficial for data that does not often change, but it can be a pitfall if not executed correctly. There is not very much database access, but we can look at each storage and make a call:
+
+* Products: The API needs to stay as up-to-date on this as possible, so I would shy away from traditional response caching unless the database was seeing significant traffic. Instead, I might implement E-Tag caching on responses because then at least the client does not have to frequently consume the same data to ensure that it has the most recent data. For those that are not aware, E-Tag caching, unlike response caching which avoids database access, reduces bandwidth usage between the Client and the API by sending a "304 - Not Modified" where appropriate.
+* Carts: Already in a "cache" and not of much concern unless on a highly constrained system
+* Specials: The document store could possibly benefit from a response cache, but, again, this could be a pitfall for the API to have latency between an update to a Special (maybe someone entered the wrong price or product) and when that update takes effect.
+
+To be sure, none of the data in this small example is at the scale to deserve caching, but many large-scale APIs implement it with great rewards.

@@ -1,6 +1,7 @@
 #!/usr/bin/env python
-import argparse
-import sys
+import os
+
+from app.client import Client
 
 
 badge = """
@@ -18,13 +19,14 @@ badge = """
         #  #  # #    # #    # ####   #####    #
         #     # ###### #####  #  #   #        #
         #     # #    # #   #  #   #  #        #
-        #     # #    # #    # #    # ######   # 
+        #     # #    # #    # #    # ######   #
 """
 
 
 if __name__ == "__main__":
     print(badge)
 
-    # Initialize / Parse CLI
-    parser = argparse.ArgumentParser(description='pipeline!')
-    args = parser.parse_args()
+    client = Client(
+        service_host=os.getenv('MARKET_SERVICE_HOST'),
+        service_port=os.getenv('MARKET_SERVICE_PORT'))
+    client.start()
