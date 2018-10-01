@@ -5,16 +5,32 @@ services:
       context: ./
       dockerfile: ./docker/client/Dockerfile
     image: morais/farmers-market:latest
+    environment:
+      MARKET_SERVICE_HOST: "${MARKET_SERVICE_HOST}"
+      MARKET_SERVICE_PORT: "${MARKET_SERVICE_PORT}"
+    depends_on:
+      - api
+  client-tests:
+    image: "morais/farmers-market:latest"
+    command: python -m pytest
     depends_on:
       - api
   api:
     build:
       context: ./
       dockerfile: ./docker/api/Dockerfile
-    image: morais/farmers-market:latest
+    image: morais/farmers-market-api:latest
     depends_on:
       - mysql
-      - redis
+      - carts
+      - documents
+  api-tests:
+    image: "morais/farmers-market-api:latest"
+    command: python -m pytest
+    depends_on:
+      - mysql
+      - carts
+      - documents
   mysql:
     image: "mysql:5.7"
     environment:
@@ -25,11 +41,24 @@ services:
       interval: 5s
     ports:
       - 3306:3306
-  redis:
+    volumes:
+      - db-data:/data/db
+  carts:
     image: "redis:alpine"
-  tests:
-    build: .
-    image: morais/farmers-market:latest
-    depends_on:
-      - mysql
-    command: python -m pytest
+  documents:
+    image: mongo:latest
+    environment:
+      MONGODB_USER: "${MONGODB_USER}"
+      MONGODB_DATABASE: "${SPECIALS_STORE}"
+      MONGODB_PASS: "${MONGODB_PASS}"
+      MONGO_DATA_DIR: /data/db
+      MONGO_LOG_DIR: /dev/null
+    volumes:
+      - doc-data:/data/db
+    ports:
+      - 27017:27017
+
+volumes:
+  db-data:
+  doc-data:
+

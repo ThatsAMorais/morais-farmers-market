@@ -3,11 +3,10 @@ FROM base as builder
 RUN mkdir /install
 WORKDIR /install
 COPY api/requirements.txt /requirements.txt
-RUN pip install --install-option="--prefix=/install" -r /requirements.txt
+RUN pip3 install --install-option="--prefix=/install" -r /requirements.txt
 
 FROM base
 COPY --from=builder /install /usr/local
-COPY ./api/src /app
+COPY ./api /app
 WORKDIR /app
-ENTRYPOINT [ "python" ]
-CMD ["api.py"]
+CMD ["python", "api.py"]
