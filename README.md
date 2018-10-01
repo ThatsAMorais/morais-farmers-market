@@ -46,7 +46,7 @@ Commands:
 
 ### Run the API standalone
 
-> `docker-compose up --build api`
+> `docker-compose up --build market-api`
 
  todo: show how to use curl to test against the API
 

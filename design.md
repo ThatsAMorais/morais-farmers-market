@@ -40,19 +40,23 @@ However, to be flexible to new products, prices, specials, and even technologica
 This is where the design could be broken down into components such as:
 
 * CLI - For operating on the Service as a test client
-* RESTful API - Serves the data resources backing the store
-* Database - A manageable store for persistent store data
-* Cart cache - a cart cache to manage the carts
+* Products Service - for serving Products
+* Database - A manageable store for persistent data
+* Cart Service - serves Cart data
+* Redis Cache - temporary key-value storage
+* Specials Service - serves Specials data
+* Document Store - stores document objects
+* RESTful API Gateway - Provides a single public layer to expose to clients
 
-I go into the defense of each component later, but a component-based design with separation of concerns is easier to manipulate than a highly-coupled monolith. As an app that one might like to reuse as the years go by, or modify externally without deploying new code, this breakdown provides access.
+I go into the defense of each component later, but a component-based design with separation of concerns is easier to manipulate than a highly-coupled monolith. As an app that one might like to reuse as the years go by, pick apart to refactor, or modify data without deploying new code, this breakdown provides many positives. These components are easily scalable, they can be replaced easily if deemed insufficient, simpler, coherent, readable, concerns are properly separated throughout the application, and probably many more advantages.
 
-It is more complex than the idea of "just a CLI app", but in fact such a CLI could be complex within. Breaking this design into services is more coherent and readable at a high-level.
-
-The complication with breaking things into services is inevitably transporting that collection of parts to a comparable system with sufficient resources. Containerization to the rescue.
+The trade-off is in locality of detail as the implementation of the entire system is spread across different parts. However, this project is stored as a monolithic repository with a composition for local development to make it easier to run and debug the full system. Another trade-off is in how much more difficult it could be to deploy a multi-headed system, but we use container orchestration for that when necessary.
 
 ### Containerization
 
 Containerization is key to validation of behavior and deployment to a variety of environments. For this reason the components of the application will be arranged as a set of service containers. This is both easy and effective, rather than a traditional installation of such a system directly in an OS without virtualization.
+
+An issue one runs into without containers/virtualization is not only in the difficulty of validating parity of behavior between local-dev and prod, but also with the differences in how technology behaves on a variety of systems such as Postgres vs MySQL.
 
 ## API
 
@@ -60,8 +64,6 @@ Containerization is key to validation of behavior and deployment to a variety of
 ***Note***: The following sections, including this one, may change a little in terms of specifics by the end of the project but the general overview should be the same.
 
 Making the case for the API before discussing the CLI is important, so I am starting there. The description of the problem implies that there are products, carts, discounts, and operations on those resources. One way that e-commerce sites manage such resources is to gate access to them via resource routes. The simpler alternative for this problem description is to hard-code the products and write specialized logic for applying coupons, etc, but it is not very maintainable or generic. At best, it is useful for one season and then will likely have to be modified then redeployed. Organizing the resources into a set of accessors via HTTP that enable management as well as client access is a more tenable solution.
-
-Most of the implementation of the market service exists in the API. Without a doubt there is a valid argument for a "market-specials-microservice" if the scale of this service grew further, such as including partner integrations and other facilities that might bloat the API. For this scope we start with a basic API that has service logic.
 
 The following are some rough ideas of datums the API will serve
 
@@ -97,7 +99,7 @@ CartItem{
 
 ### Specials
 
-While these items will not be served as resources, they API will have a layer to calculate the effect that specials have on a cart.
+Here are some conceptual data types for the way Specials will be described in the system:
 
 Specials can vary, but they always consist of the form:
 > ***condition*** --> ***reward*** (limited to "***limit***")
@@ -176,7 +178,7 @@ todo: APOM
 ## CLI
 
 ----
-Overshadowed by the larger underlying system, the solution does require a test client for analyzing the accuracy of the design. This is a separate application which calls the API as any client would, using HTTP. By not attaching the CLI as a wrapper on the API implementation, one can ship this CLI independently, point this CLI at any API service, or even write it in a different language. After all, a GUI might be a better way to interact with the API.
+Overshadowed by the larger underlying system, the solution does require a test client, i.e. "store front", for demonstration and analysis. This is a separate application which calls the API as any client would call a RESTFul API, using HTTP. The CLI is flexible in that it can be shipped independently since it is standalone, can be pointed at any API service, or even thrown out and written in a different language. After all, graphical UX is a better way to interact with the API.
 
 ## Database
 
@@ -211,32 +213,30 @@ Yet, I assumed that this year's farmer's market debut on e-commerce is just the 
 At a high level we have a system with the following design:
 
 ```pretty drawings
-  |-----------|        |-------|       |-------------|      |---------------|
-  | Client(s) | ---->  |  API  | ----> | Product Svc |----> | Products (DB) |
-  |-----------|        |-------|       |-------------|      |---------------|
-                           |
-                           |           |--------------|      |-----------------------|
-                           |---------> | Specials Svc |----> |  Specials (Documents) |
-                           |           |--------------|      |-----------------------|
-                           |
-                           |           |-----------|      |---------------|
-                           |---------> | Carts Svc |----> | Carts (Cache) |
-                                       |-----------|      |---------------|
+  |-----------|        |---------|       |-------------|      |---------------|
+  | Client(s) | ---->  | Gateway | ----> | Product Svc |----> | Products (DB) |
+  |-----------|        |---------|       |-------------|      |---------------|
+                           |                   ^
+                           |                   |
+                           |             |-----------|        |---------------|
+                           |-----------> | Carts Svc |------> | Carts (Cache) |
+                           |             |-----------|        |---------------||
+                           |                   |
+                           |                   v
+                           |             |--------------|     |-----------------------|
+                           |-----------> | Specials Svc |---> |  Specials (Documents) |
+                           |             |--------------|     |-----------------------|
 ```
 
-The API speaks to the service layer, which serves data from storage, and the CLI would be a client application communicating with the API for its views of that data.
+The API is a public gateway that proxies to the service layer, which serves data from storage. The CLI is a client application communicating with the API for its views of that data.
 
 ### Multiple Apps
 
-Two of the components, the Client CLI and the API must be built from source. Having already justified the reasoning behind separating these two into separate apps, I want to point out that this will also require two Dockerfiles.
-
-If you look in the `docker` directory, you will notice two directories corresponding to the two applications each containing a Dockerfile.
-
-This is simple to handle in docker-compose, as well, so as not to interrupt local development. One must merely direct each service to its corresponding Dockerfile under the `build` block, which you can examine in `docker-compose.yml`
+Having this many services requires a Dockerfile for each. If you look in the `docker` directory, you will notice multiple directories corresponding to the applications, each containing a Dockerfile. In docker-compose, one merely directs each service to its corresponding Dockerfile under the `build` block (See: `docker-compose.yml`)
 
 ### Source Layout
 
-At the root are meta files and docker-compose; not just so they are easy to find, but also to avoid shipping them in any images.
+At the root are meta files such as ignore, .env, to avoid shipping them in any images.
 
 In order to aid coherence of the repository for future maintenance, the two applications are split into separate projects. Within those projects are the `src` directory, which contains the code to be shipped in the image, and the apps package dependencies, as `requirements.txt`. The `api` also has a tests directory. The client may require test coverage, but it is less significant
 
@@ -301,5 +301,14 @@ Caching to avoid database calls can be beneficial for data that does not often c
 * Products: The API needs to stay as up-to-date on this as possible, so I would shy away from traditional response caching unless the database was seeing significant traffic. Instead, I might implement E-Tag caching on responses because then at least the client does not have to frequently consume the same data to ensure that it has the most recent data. For those that are not aware, E-Tag caching, unlike response caching which avoids database access, reduces bandwidth usage between the Client and the API by sending a "304 - Not Modified" where appropriate.
 * Carts: Already in a "cache" and not of much concern unless on a highly constrained system
 * Specials: The document store could possibly benefit from a response cache, but, again, this could be a pitfall for the API to have latency between an update to a Special (maybe someone entered the wrong price or product) and when that update takes effect.
+* Gateway: Both Response and E-Tag caching should be applied to present this layer with as many options to decrease load on the services.
 
 To be sure, none of the data in this small example is at the scale to deserve caching, but many large-scale APIs implement it with great rewards.
+
+### Container Orchestration
+
+K8s, obviously; The compose for this project is quite large. Naturally, if this project was headed to a `stage` server, it should be done via a helm script.
+
+### Service Base Image
+
+A base image containing several of the requirements on all flask-based services would speed up the initial build of all services. Such libs as Flask, pytest, and requests, are included in all 5 services, except for the client that doesn't use Flask. It doesn't take forever, but its enough to go AFK (which might not be so bad).
