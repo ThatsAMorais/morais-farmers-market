@@ -1,4 +1,4 @@
-FROM python:3.7-alpine as base
+FROM python:3.7 as base
 FROM base as builder
 RUN mkdir /install
 WORKDIR /install
@@ -9,4 +9,4 @@ FROM base
 COPY --from=builder /install /usr/local
 COPY ./products /app
 WORKDIR /app
-CMD ["python", "api.py"]
+CMD ["python", "app.py"]

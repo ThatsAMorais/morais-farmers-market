@@ -6,8 +6,8 @@ import requests
 class Client:
     """Farmer's Market API Client"""
 
-    def __init__(self, protocol='https', service_host='api', service_port='5000'):
-        self.service_url = protocol + '://' + service_host + ':' + service_port
+    def __init__(self, protocol='https', service_host='market-api'):
+        self.service_url = protocol + '://' + service_host
         self.cart_id = None
 
     def commands(self):
@@ -97,9 +97,8 @@ class Client:
     def products(self):
         """Return the products table"""
         r = requests.get('/'.join((self.service_url, 'products')))
-        # TODO: Format the products table as a multi-line string
-        json.loads(r.json())
-        return ""
+        products = json.loads(r.json)
+        return '\n'.join(line.center(max(map(len, products))) for line in products)
 
 
 # Signal for communicating to the application loop

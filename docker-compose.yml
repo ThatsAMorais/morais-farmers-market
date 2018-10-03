@@ -6,15 +6,16 @@ services:
       dockerfile: ./docker/client/Dockerfile
     image: morais/farmers-market-client:latest
     environment:
-      MARKET_SERVICE_HOST: api
-      MARKET_SERVICE_PORT: "${MARKET_GATEWAY_PORT}"
-    links:
-      - market-api:api 
+      MARKET_SERVICE_HOST: market-api
     depends_on:
       - market-api
+      - products-seed
   client-tests:
     image: "morais/farmers-market-client:latest"
     command: python -m pytest
+    depends_on:
+      - market-api
+      - products-seed
   market-api:
     build:
       context: ./
@@ -22,15 +23,8 @@ services:
     image: morais/farmers-market-api:latest
     environment:
       MARKET_PRODUCTS_HOST: products 
-      MARKET_PRODUCTS_PORT: "${MARKET_PRODUCTS_PORT}"
       MARKET_CARTS_HOST: carts
-      MARKET_CARTS_PORT: "${MARKET_CARTS_PORT}"
       MARKET_SPECIALS_HOST: specials
-      MARKET_SPECIALS_PORT: "${MARKET_SPECIALS_PORT}"
-    links:
-      - products:products
-      - carts:carts
-      - specials:specials
     depends_on:
       - products
       - carts
@@ -38,32 +32,39 @@ services:
   market-api-tests:
     image: "morais/farmers-market-api:latest"
     command: python -m pytest
+    depends_on:
+      - products
+      - carts
+      - specials
   products:
     build:
       context: ./
       dockerfile: ./docker/products/Dockerfile
     image: morais/farmers-market-products:latest
     environment:
-      PRODUCT_DB_HOST: db
-      PRODUCT_DB_PORT: 3306
-    links:
-      - productdb:db
+      PRODUCT_DB_HOST: productdb
     depends_on:
       - productdb
   products-tests:
     image: "morais/farmers-market-products:latest"
     command: python -m pytest
     environment:
-      PRODUCT_DB_HOST: db
-      PRODUCT_DB_PORT: 3306
-    links:
-      - productdb:db
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      PRODUCT_DB_HOST: productdb
+    depends_on:
+      - productdb
+  products-seed:
+    image: "morais/farmers-market-products:latest"
+    command: python seed.py
+    environment:
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      PRODUCT_DB_HOST: productdb
     depends_on:
       - productdb
   productdb:
     image: "mysql:5.7"
     environment:
-      MYSQL_ROOT_PASSWORD: "password"
+      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
       MYSQL_DATABASE: "market"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-ppassword", "--silent"]
@@ -118,7 +119,7 @@ services:
     volumes:
       - doc-data:/data/db
     ports:
-      - 27017:27017
+      - 32001:27017
 
 volumes:
   db-data:

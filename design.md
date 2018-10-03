@@ -282,6 +282,10 @@ A proper frontend, such as an application or web view, would be more fluid for t
 
 For this Flask API one could follow the pack and use Jinja 2 to render data from the backend in HTML, but since the interface is HTTP it could be almost any popular frontend technology.
 
+### Security and Access Control
+
+Any web resource, especially one exposing endpoints to backend data, must be secured. OAuth2 and OpenID are means to control and authorize access. There is also TLS for service security.
+
 ### Better Data Management
 
 The technical knowledge required to operate the system could be decreased if better management tools were provided for adding new specials, modifying products, etc.

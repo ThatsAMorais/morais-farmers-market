@@ -19,16 +19,16 @@ def test_client_handle_create_new_cart():
     assert len(result) == 2, "expected 2 strings, but got {0}".format(len(result))
 
 
-def test_client_handle_get_invoice():
-    result = Client().handle('invoice')
-    assert len(result) > 0, "expected > 0 strings"
+# def test_client_handle_get_invoice():
+#     result = Client().handle('invoice')
+#     assert len(result) > 0, "expected > 0 strings"
 
 
-def test_client_handle_get_products():
-    result = Client().handle('products')
-    assert len(result) > 0, "expected > 0 strings"
+# def test_client_handle_get_products():
+#     result = Client().handle('products')
+#     assert len(result) > 0, "expected > 0 strings"
 
 
-def test_client_handle_add_item():
-    result = Client().handle('anything')
-    assert len(result) == 2, "expected 2 strings, but got {0}".format(len(result))
+# def test_client_handle_add_item():
+#     result = Client().handle('anything')
+#     assert len(result) == 2, "expected 2 strings, but got {0}".format(len(result))

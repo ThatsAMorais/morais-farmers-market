@@ -1,23 +1,24 @@
-import os
 
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask  # , request, jsonify
 
 
-app = Flask("Market-API")
+api = Flask(__name__)
 
 
-@app.route('/carts', methods=['POST'])
+@api.route('/carts', methods=['POST'])
 def create_cart():
-    return jsonify(cart_service.get_cart())
+    # return jsonify(cart_service.get_cart())
+    pass
 
 
-@app.route('/cart/<id>', methods=['GET'])
+@api.route('/cart/<id>', methods=['GET'])
 def get_cart(id):
-    return jsonify(cart_service.get_cart(id))
+    # return jsonify(cart_service.get_cart(id))
+    pass
 
 
-@app.route('/cart/<id>', methods=['PATCH'])
+@api.route('/cart/<id>', methods=['PATCH'])
 def update_cart(id):
     """
     Add/Remove items from the cart
@@ -38,17 +39,13 @@ def update_cart(id):
     return ('', 204)
 
 
-@app.route('/cart/<id>/invoice', methods=['GET'])
+@api.route('/cart/<id>/invoice', methods=['GET'])
 def get_cart_invoice(id):
     # total = cart_service.invoice['total']
     pass
 
 
-@app.route('/products', methods=['GET'])
+@api.route('/products', methods=['GET'])
 def get_products():
-    # product_service.get
-    pass 
-
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=os.getenv("MARKET_GATEWAY_PORT", "15000"))
+    r = requests.get('https://products')
+    return r.json
