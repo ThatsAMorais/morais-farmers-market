@@ -1,6 +1,11 @@
+import os
 
 import requests
-from flask import Flask  # , request, jsonify
+from flask import Flask, jsonify, request
+
+
+products_service_host = os.getenv('PRODUCT_SERVICE_HOST')
+carts_service_host = os.getenv('CART_SERVICE_HOST')
 
 
 api = Flask(__name__)
@@ -8,14 +13,16 @@ api = Flask(__name__)
 
 @api.route('/carts', methods=['POST'])
 def create_cart():
-    # return jsonify(cart_service.get_cart())
-    pass
+    r = requests.post(carts_service_host + '/carts')
+    return (r.json, 201)
 
 
 @api.route('/cart/<id>', methods=['GET'])
 def get_cart(id):
-    # return jsonify(cart_service.get_cart(id))
-    pass
+    url = carts_service_host + '/cart/' + id
+    cart = requests.get(url).json
+    total = requests.patch(url + '/invoice').json['total']
+    return (jsonify(dict(total=total, cart=cart)), 200)
 
 
 @api.route('/cart/<id>', methods=['PATCH'])
@@ -32,20 +39,19 @@ def update_cart(id):
         }
     }
     """
-    # TODO
-    # cart_service.add_items(id, request.form.get('add'))
-    # cart_service.remove_items(id, request.form.get('remove'))
-    # total = cart_service.invoice['total']
-    return ('', 204)
+    url = carts_service_host + '/cart/' + id
+    data = dict(add=request.form.get('add'), remove=request.form.get('remove'))
+    cart = requests.patch(url, data=data).json
+    total = requests.patch(url + '/invoice').json['total']
+    return (jsonify(dict(total=total, cart=cart)), 200)
 
 
 @api.route('/cart/<id>/invoice', methods=['GET'])
 def get_cart_invoice(id):
-    # total = cart_service.invoice['total']
-    pass
+    return (requests.patch(carts_service_host + '/cart/' + id + '/invoice').json, 200)
 
 
 @api.route('/products', methods=['GET'])
 def get_products():
-    r = requests.get('https://products')
-    return r.json
+    r = requests.get(products_service_host + '/products')
+    return (r.json, 200)

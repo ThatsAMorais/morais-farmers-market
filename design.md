@@ -22,6 +22,18 @@ The result should demonstrate a conscientiousness toward the following character
  1. Flexibility
  1. Containerization
 
+## Value
+
+This is some of the projected value of this design
+
+1. Separation of features into small, sensible services brings high flexibility, scalability, maintainability, and coherence, presenting a tangible perception that the product is valuable to one who is interested in administering such a system (i.e. a customer of a software consultancy).
+1. Driven by tests from the beginning, the implementation is guaranteed to adhere to designs, requirements, and be resilient to later modification.
+1. smaller services = fewer lines of code = components can be refactored within clearly contracted boundaries, reducing software development costs of future investments
+1. Each unit is small enough that scaling is both surgical and low cost, reducing operational costs
+1. Containerization makes DevOps's life easier compared to non-virtualized CI/CD, lowering costs and reducing the impact of production incidents
+1. Manageable content makes for reusability of the system across different product lines and business cycles
+1. SOA reduces the difficulty of integrating a 3rd party with a particular resource, presenting a multitude of growth opportunities
+
 ## Brainstorming
 
 ----
@@ -31,7 +43,7 @@ Firstly, the user must be able to enter items and request an invoice for the cur
 
 But first, TDD. Regardless of what the implementation of these commands will be, tests can be written to validate the expected behavior. Also, that means the implementations of the commands must be testable, so they should be abstracted to methods.
 
-Accuracy describes a correct implementation with working features, which requires correct prices, output displayed as requested, discounts applied, and the ability to generate the output on demand. The current register must be persisted for the session or until cleared which could be accomplished with local memory. Products, prices, and specials could be defined as "constants" if we were to assume they will never change.
+Accuracy describes a correct implementation with working features, which requires correct prices, output displayed as requested, discounts applied, and the ability to generate the invoice on demand. The current register must be persisted for the session or until cleared which could be accomplished with local memory. Products, prices, and specials could be defined as "constants" if we were to assume they will never change.
 
 However, to be flexible to new products, prices, specials, and even technological choices, the design should separate concerns better. For example, the most important element of this application is conveying prices and products available for only a limited time. Therefore, those elements that may change should be configurable without deploying new code, such as through APIs and a database.
 
@@ -48,9 +60,9 @@ This is where the design could be broken down into components such as:
 * Document Store - stores document objects
 * RESTful API Gateway - Provides a single public layer to expose to clients
 
-I go into the defense of each component later, but a component-based design with separation of concerns is easier to manipulate than a highly-coupled monolith. As an app that one might like to reuse as the years go by, pick apart to refactor, or modify data without deploying new code, this breakdown provides many positives. These components are easily scalable, they can be replaced easily if deemed insufficient, simpler, coherent, readable, concerns are properly separated throughout the application, and probably many more advantages.
+I go into the defense of each component later, but a component-based design with separation of concerns is easier to manipulate than a highly-coupled monolith. As an app that one might like to reuse as the years go by, pick apart to refactor, or modify data without deploying new code, this breakdown provides many positives. These components are easily scalable, they can be replaced easily if deemed insufficient, simpler, coherent, readable, concerns are properly separated throughout the application, and likely many more advantages.
 
-The trade-off is in locality of detail as the implementation of the entire system is spread across different parts. However, this project is stored as a monolithic repository with a composition for local development to make it easier to run and debug the full system. Another trade-off is in how much more difficult it could be to deploy a multi-headed system, but we use container orchestration for that when necessary.
+The trade-off is in locality of detail as the implementation of the entire system is spread across different parts. However, this project is stored as a monolithic repository with a composition for local development to make it easier to run and debug the full system. Another trade-off is in how much more difficult it could be to deploy a multi-headed system, but we use container orchestration for that.
 
 ### Containerization
 
@@ -85,15 +97,6 @@ Product{
     price,
     active,
     date_added,
-}
-```
-
-### Carts
-
-```pseudo
-CartItem{
-    cart
-    items
 }
 ```
 
@@ -198,7 +201,40 @@ For one, specials have too many optional parts, and there needs to be a clear me
 ## Cart Cache
 
 ----
-Carts are data that would be persisted for only a session, at least given the current requirements, so rather than store them in the database where they will build up and be forgotten, they will merely be cached for a TTL server-side.
+Carts are data that would be persisted for a limited time, at least given the current requirements, so rather than store them in the database where they will build up and be forgotten, they will merely be cached for a finite TTL in a key-value store.
+
+The carts will be stored kinda like this:
+
+| key | value |
+|----|----|
+|GUID|list(products)|
+|invoice:GUID|json|
+
+```python
+GUID: [ "product_code", ...]
+```
+
+```python
+invoice:GUID : {
+    "total": 1.0,
+    "items": [
+        {
+            "code": 'product-code',
+            "price": 2.0,
+            "specials": [
+                {
+                    "code": 'specials-code',
+                    "adjustment": -1.0
+                },  # ....
+            ]
+        },  # ....
+    ]
+}
+```
+
+The invoice will not be calculated until it is requested, but it will be stored afterward for future queries on the same cart state. Therefore, when a cart is updated, its invoice must be recalculated. Its simplistic to remove the invalidated invoice so that it can be recalculated later with the latest information, but it may be totally sufficient. One could imagine a system that updates the invoice, but that may be complex.
+
+This is where some `Future Work` could be invested to improve this solution. However, one should not optimize a system that might seem to do extra work through its statelessness which could be stored. Furthermore, one should first resort to caching before increasing storage requirements prior to reaching a scale where this solution is costly or prohibitive.
 
 ## Is this overly-complex
 
@@ -220,7 +256,7 @@ At a high level we have a system with the following design:
                            |                   |
                            |             |-----------|        |---------------|
                            |-----------> | Carts Svc |------> | Carts (Cache) |
-                           |             |-----------|        |---------------||
+                           |             |-----------|        |---------------|
                            |                   |
                            |                   v
                            |             |--------------|     |-----------------------|
@@ -240,10 +276,6 @@ At the root are meta files such as ignore, .env, to avoid shipping them in any i
 
 In order to aid coherence of the repository for future maintenance, the two applications are split into separate projects. Within those projects are the `src` directory, which contains the code to be shipped in the image, and the apps package dependencies, as `requirements.txt`. The `api` also has a tests directory. The client may require test coverage, but it is less significant
 
-### SOA
-
-Because there are various faculties of the API which could grow in complexity, it is desirable to insulate the API layer from that possibility, as it is comprised of contracts, customer-facing, and should always be available. This is accomplished by abstracting data access from the interface itself. The interface (API) presents a view of data, the store contains data, but the service provides data. This way, if we want to break out a service, the API is none the wiser, as long as the output from the service layer is the same.
-
 ### TDD
 
 I shall adhere to a test-driven approach as much as possible, because being runnable and having tools to verify accurately as you code is key to a healthy progression through the workload of implementing the API.
@@ -256,7 +288,7 @@ Connection details and other options will be supplied via environment, but if th
 
 The CLI will be written in Python, although it could be written in anything. I almost wrote it in Go because, personally, I enjoy writing Go CLI after doing a considerable research into a few different styles. However, that was not enough of a reason to make the project bilingual.
 
-Using Python/Flask for the API is straight-forward, in my opinion, because the API is not yet very complex and Flask grows well with time.
+Using Python/Flask for the API(s) is straight-forward because each API is not yet very complex and Flask grows well with time.
 
 The Products DB will simply be MySQL, but that is an artifact that could likely be changed at the deployment and configuration level.
 
@@ -266,11 +298,6 @@ For a temporary Cart store we can use the Redis key-value store, as it is a popu
 
 The tests are written for pytest, and a docker-compose command will run them (see README.md).
 
-## Notes
-
-----
-These are updates or additional comments about the design added afterward...
-
 ## Future Work
 
 ----
@@ -278,7 +305,7 @@ Always room to improve...
 
 ### Better UX
 
-A proper frontend, such as an application or web view, would be more fluid for the customer amounting to greater sales, and likely the most valuable return on investment.
+A proper frontend, such as an application or web view, would be more fluid for the customer than a CLI, amounting to greater sales. Likely the most valuable return on investment.
 
 For this Flask API one could follow the pack and use Jinja 2 to render data from the backend in HTML, but since the interface is HTTP it could be almost any popular frontend technology.
 
@@ -316,3 +343,7 @@ K8s, obviously; The compose for this project is quite large. Naturally, if this 
 ### Service Base Image
 
 A base image containing several of the requirements on all flask-based services would speed up the initial build of all services. Such libs as Flask, pytest, and requests, are included in all 5 services, except for the client that doesn't use Flask. It doesn't take forever, but its enough to go AFK (which might not be so bad).
+
+### Reduce Python Package Dependencies
+
+Arguably, Python culture is one that favors reuse, but with adoption of a package comes binding to the patterns and styles of it. I would like to reduce the dependency on any but the most basic wrappers on 3rd party tech, which I attempted to do but feel there is room for improvement.

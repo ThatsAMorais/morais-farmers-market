@@ -6,13 +6,15 @@ services:
       dockerfile: ./docker/client/Dockerfile
     image: morais/farmers-market-client:latest
     environment:
-      MARKET_SERVICE_HOST: market-api
+      MARKET_SERVICE_HOST: http://market-api:${MARKET_GATEWAY_PORT}
     depends_on:
       - market-api
       - products-seed
   client-tests:
     image: "morais/farmers-market-client:latest"
     command: python -m pytest
+    environment:
+      MARKET_SERVICE_HOST: http://market-api:${MARKET_GATEWAY_PORT}
     depends_on:
       - market-api
       - products-seed
@@ -22,9 +24,10 @@ services:
       dockerfile: ./docker/gateway/Dockerfile
     image: morais/farmers-market-api:latest
     environment:
-      MARKET_PRODUCTS_HOST: products 
-      MARKET_CARTS_HOST: carts
-      MARKET_SPECIALS_HOST: specials
+      MARKET_GATEWAY_PORT: "${MARKET_GATEWAY_PORT}"
+      CART_SERVICE_HOST: http://carts:${MARKET_CARTS_PORT}
+      PRODUCT_SERVICE_HOST: http://products:${MARKET_PRODUCTS_PORT}
+      SPECIALS_SERVICE_HOST: http://specials:${MARKET_SPECIALS_PORT}
     depends_on:
       - products
       - carts
@@ -32,6 +35,10 @@ services:
   market-api-tests:
     image: "morais/farmers-market-api:latest"
     command: python -m pytest
+    environment:
+      CART_SERVICE_HOST: http://carts:${MARKET_CARTS_PORT}
+      PRODUCT_SERVICE_HOST: http://products:${MARKET_PRODUCTS_PORT}
+      SPECIALS_SERVICE_HOST: http://specials:${MARKET_SPECIALS_PORT}
     depends_on:
       - products
       - carts
@@ -42,6 +49,8 @@ services:
       dockerfile: ./docker/products/Dockerfile
     image: morais/farmers-market-products:latest
     environment:
+      MARKET_PRODUCTS_PORT: ${MARKET_PRODUCTS_PORT}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       PRODUCT_DB_HOST: productdb
     depends_on:
       - productdb
@@ -49,7 +58,7 @@ services:
     image: "morais/farmers-market-products:latest"
     command: python -m pytest
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       PRODUCT_DB_HOST: productdb
     depends_on:
       - productdb
@@ -57,14 +66,14 @@ services:
     image: "morais/farmers-market-products:latest"
     command: python seed.py
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       PRODUCT_DB_HOST: productdb
     depends_on:
       - productdb
   productdb:
     image: "mysql:5.7"
     environment:
-      MYSQL_ROOT_PASSWORD: "${MYSQL_ROOT_PASSWORD}"
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: "market"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-ppassword", "--silent"]
@@ -79,41 +88,51 @@ services:
       dockerfile: ./docker/carts/Dockerfile
     image: morais/farmers-market-carts:latest
     environment:
-      CART_STORE_HOST: store
-      CART_STORE_PORT: 
-    links:
-      - cartstore:store
+      MARKET_CARTS_PORT: "${MARKET_CARTS_PORT}"
+      CART_STORE_HOST: cart-store
+      PRODUCT_SERVICE_HOST: http://products:${MARKET_PRODUCTS_PORT}
+      SPECIALS_SERVICE_HOST: http://specials:${MARKET_SPECIALS_PORT}
     depends_on:
-      - cartstore
+      - products
+      - cart-store
+      - specials
   carts-tests:
     image: "morais/farmers-market-carts:latest"
     command: python -m pytest
-    links:
-      - cartstore:store
+    environment:
+      MARKET_CARTS_PORT: ${MARKET_CARTS_PORT}
+      CART_STORE_HOST: cart-store
+      PRODUCT_SERVICE_HOST: http://products:${MARKET_PRODUCTS_PORT}
+      SPECIALS_SERVICE_HOST: http://specials:${MARKET_SPECIALS_PORT}
     depends_on:
-      - cartstore
-  cartstore:
+      - products
+      - products-seed
+      - cart-store
+      - specials
+  cart-store:
     image: "redis:alpine"
   specials:
     build:
       context: ./
       dockerfile: ./docker/specials/Dockerfile
     image: morais/farmers-market-specials:latest
+    environment:
+      MARKET_SPECIALS_PORT: "${MARKET_SPECIALS_PORT}"
     depends_on:
-      - docstore
+      - doc-store
   specials-tests:
     image: "morais/farmers-market-specials:latest"
     command: python -m pytest
     links:
-      - docstore:store
+      - doc-store:store
     depends_on:
-      - docstore
-  docstore:
+      - doc-store
+  doc-store:
     image: mongo:latest
     environment:
-      MONGODB_USER: "${MONGODB_USER}"
-      MONGODB_DATABASE: "${SPECIALS_STORE}"
-      MONGODB_PASS: "${MONGODB_PASS}"
+      MONGODB_USER: ${MONGODB_USER}
+      MONGODB_DATABASE: ${SPECIALS_STORE}
+      MONGODB_PASS: ${MONGODB_PASS}
       MONGO_DATA_DIR: /data/db
       MONGO_LOG_DIR: /dev/null
     volumes:

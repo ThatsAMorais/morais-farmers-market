@@ -51,9 +51,9 @@ def get_products():
     return jsonify([x.to_dict() for x in Product.query.all()])
 
 
-@products.route('/product/<id>', methods=['GET'])
-def get_product(id):
-    return jsonify(Product.query.filter_by(id=id).first().to_dict())
+@products.route('/product/<code>', methods=['GET'])
+def get_product(code):
+    return jsonify(Product.query.filter_by(code=code).first().to_dict())
 
 
 @products.route('/product/<id>', methods=['DELETE'])
