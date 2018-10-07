@@ -1,6 +1,6 @@
 # Morais Farmer's Market - Design
 
-A CLI application backed by a shop API with a MySQL database
+A CLI application backed by a shop API with a MySQL database.
 
 ## Goals
 
@@ -33,6 +33,10 @@ This is some of the projected value of this design
 1. Containerization makes DevOps's life easier compared to non-virtualized CI/CD, lowering costs and reducing the impact of production incidents
 1. Manageable content makes for reusability of the system across different product lines and business cycles
 1. SOA reduces the difficulty of integrating a 3rd party with a particular resource, presenting a multitude of growth opportunities
+
+## Break the 4th wall a moment
+
+"This is huge!" I completely understand that reaction. I could have written another CLI application, avoiding deeply nested loops, choosing appropriate data structures, and ensuring my edge cases. However, over the past 5 years the opportunities I have pursued in my career have brought many lessons, and this project was a way to culminate that period of time into a piece of work representative of my knowledge in the API and Web Service problem domain. In truth, it could not possibly cover every detail as it is a specific problem with its own trade-offs, and such products are imperfect therefore prone to improvements over time. So, I am using this opportunity, and taking liberty in it, to "go too far" or consider a wider set of goals than the problem description would imply, especially since this application is somewhat hypothetical with no real stakeholders to suffer at the expense of my liberties.
 
 ## Brainstorming
 
@@ -77,8 +81,6 @@ An issue one runs into without containers/virtualization is not only in the diff
 
 Making the case for the API before discussing the CLI is important, so I am starting there. The description of the problem implies that there are products, carts, discounts, and operations on those resources. One way that e-commerce sites manage such resources is to gate access to them via resource routes. The simpler alternative for this problem description is to hard-code the products and write specialized logic for applying coupons, etc, but it is not very maintainable or generic. At best, it is useful for one season and then will likely have to be modified then redeployed. Organizing the resources into a set of accessors via HTTP that enable management as well as client access is a more tenable solution.
 
-The following are some rough ideas of datums the API will serve
-
 ### Product
 
 These are products:
@@ -102,16 +104,16 @@ Product{
 
 ### Specials
 
-Here are some conceptual data types for the way Specials will be described in the system:
+Specials must be expressed and codified so the system can apply them. Here are some conceptual data types for the way Specials will be described in the system:
 
-Specials can vary, but they always consist of the form:
+Specials consist of:
 > ***condition*** --> ***reward*** (limited to "***limit***")
 
-Conditions also come in a common format
+Conditions have the form:
 > if cart contains ***quantity*** of ***product***, then (sufficient conditions met)
 
-Rewards then have the form
-> ***product*** price changed by ***percent***
+Rewards have the form
+> ***product*** price changed by ***percent*** (limited to quantity)
 
 Here are a few examples
 
@@ -120,63 +122,21 @@ Here are a few examples
 1. > CHMK -- Purchase a box of Chai and get milk free. (Limit 1)
 1. > APOM -- Purchase a bag of Oatmeal and get 50% off a bag of Apples
 
-And here is a potential anatomy for specials, conditions, and rewards
+The above discounts are simple, but with one concerning overlap regarding an apple discount when buying oatmeal and exceeding 3 bags of apples in one cart. There are three mathematical strategies we can use:
 
-```pseudo
-Special{
-    code,
-    condition,
-    reward,
-    limit,
-}
-```
+* Add all discounts together as a single percentage, producing the best outcome for the shopper
+* More balanced, but on average smaller individually, producing the best outcome for the store
+* Apply each in increasing order, producing somewhere in the middle
 
-```pseudo
-Condition{
-    product,
-    quantity,
-}
-```
+I will choose the last one for the sake of being able to sort the possible reward from lowest to highest.
 
-```pseudo
-Reward{
-    id,
-    product,
-    price_change,
-    quantity
-}
-```
+#### Storage
 
-So, the specials might be translated into the following descriptions
+Specials do not fit the SQL model. They are a complex expression containing multiple datums that are only relevant to each other. While we want to store and manage them independent of the service implementation, they do not lend themselves well to table columns because of their document nature. For these, a document store would be more appropriate.
 
-```python
-todo/wip
+For one, specials have too many optional parts, and there needs to be a clear method of conveying them to services. Also, the service could be flexible to different formats of specials descriptions because there is no schema. The main point, its easier than asking "content providers" to fit their coupons into our arbitrary table design.
 
-special: {
-    code: 'BOGO',
-    limit: 0,
-    condition: {
-        product: '<product code>'
-    },
-    reward: {
-        free: {
-            product: '<product code>'
-        }
-    },
-}
-```
-
-```python
-todo: APPL
-```
-
-```python
-todo: CHMK
-```
-
-```python
-todo: APOM
-```
+See the cashier/seed.py for a description of how I codified specials into json to be stored as documents.
 
 ## CLI
 
@@ -191,12 +151,6 @@ The database is intended to store all of the data of an application which is ext
 Databases are a natural fit for storing products, but there are 2 flavors that come to mind, relational and non-relational(i.e. NoSQL). There is a case for the market's products to be stored in a relational database, because they may ultimately be related to other datums such as specials, carts, transactions, recommendations, reviews, distributors, or many others.
 
 I concede that if products are the only thing in the database ever, no exceptions, then they could instead be stored in a key-value store.
-
-### Storing Specials
-
-Specials do not fit the SQL model. They are a complex expression containing multiple datums that are only relevant to each other. While we want to store and manage them independent of the service implementation, they do not lend themselves well to table columns because of their document nature. For these, a document store would be more appropriate.
-
-For one, specials have too many optional parts, and there needs to be a clear method of conveying them to services. Also, the service could be flexible to different formats of specials descriptions because there is no schema. The main point, its easier than asking "content providers" to fit their coupons into our arbitrary table design.
 
 ## Cart Cache
 
@@ -221,9 +175,9 @@ invoice:GUID : {
         {
             "code": 'product-code',
             "price": 2.0,
-            "specials": [
+            "special": [
                 {
-                    "code": 'specials-code',
+                    "code": 'special-code',
                     "adjustment": -1.0
                 },  # ....
             ]
@@ -246,22 +200,22 @@ Yet, I assumed that this year's farmer's market debut on e-commerce is just the 
 ## Technical Details
 
 ----
-At a high level we have a system with the following design:
+With those details realized, we may now consider data structures for the solution. At a high level we have the following design:
 
 ```pretty drawings
-  |-----------|        |---------|       |-------------|      |---------------|
-  | Client(s) | ---->  | Gateway | ----> | Product Svc |----> | Products (DB) |
-  |-----------|        |---------|       |-------------|      |---------------|
-                           |                   ^
-                           |                   |
-                           |             |-----------|        |---------------|
-                           |-----------> | Carts Svc |------> | Carts (Cache) |
-                           |             |-----------|        |---------------|
-                           |                   |
-                           |                   v
-                           |             |--------------|     |-----------------------|
-                           |-----------> | Specials Svc |---> |  Specials (Documents) |
-                           |             |--------------|     |-----------------------|
+  |-----------|        |-------------|       |-------------|      |---------------|
+  | Client(s) | ---->  | Gateway API | ----> | Product Svc |----> | Products (DB) |
+  |-----------|        |-------------|       |-------------|      |---------------|
+                           |                       ^
+                           |                       |
+                           |                 |-------------|      |-----------------------|
+                           |---------------> | Cashier Svc |----> |  Specials (Documents) |
+                           |                 |-------------|      |-----------------------|
+                           |                       |
+                           |                       v
+                           |                 |-----------|        |---------------|
+                           |---------------> | Carts Svc |------> | Carts (Cache) |
+                           |                 |-----------|        |---------------|
 ```
 
 The API is a public gateway that proxies to the service layer, which serves data from storage. The CLI is a client application communicating with the API for its views of that data.

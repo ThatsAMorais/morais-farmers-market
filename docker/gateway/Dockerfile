@@ -9,4 +9,4 @@ FROM base
 COPY --from=builder /install /usr/local
 COPY ./gateway /app
 WORKDIR /app
-CMD ["python", "api.py"]
+CMD ["python", "app.py"]
