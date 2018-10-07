@@ -6,7 +6,7 @@ from flask_testing import TestCase
 from app.products import db, products
 
 
-class MyTest(TestCase):
+class APITest(TestCase):
 
     def create_app(self):
         app = products

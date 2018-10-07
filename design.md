@@ -271,6 +271,10 @@ Any web resource, especially one exposing endpoints to backend data, must be sec
 
 The technical knowledge required to operate the system could be decreased if better management tools were provided for adding new specials, modifying products, etc.
 
+### API Documentation
+
+There are a handful of API's and its a no-brainer to have a more comprehensive documentation of thi system than just this document and the code itself.
+
 ### Specials Microservice
 
 Breaking out the coupons/specials to a micro-service, which I might like to write in Go, would allow for the gritty details of parsing and 3rd party noise to be extracted from the otherwise straight-forward API layer.
