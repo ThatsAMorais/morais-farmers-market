@@ -1,30 +1,37 @@
 import json
-
+import time
 import requests
+from collections import defaultdict
 
 
 class Client:
     """Farmer's Market API Client"""
 
-    def __init__(self, protocol='https', service_host='market-api'):
-        self.service_url = protocol + '://' + service_host
+    def __init__(self, service_host='market-api'):
+        self.service_url = service_host
         self.cart_id = None
 
     def commands(self):
         return (
-            "Welcome to The Farmer's Market!",  # self.products(),
             'Commands:',
             '\tproducts : List the available products',
+            '\tspecials : List ongoing specials',
             '\t<product code>[,...] : Add products to cart',
             '\tinvoice : Show the detailed invoice',
             '\tnew : Empty the current Cart',
             '\texit : Close the market app',
             '\t<empty prompt> : Show these commands',
-            )
+        )
 
     def start(self):
         """Start handling input in the interaction loop"""
+
+        # Dependency Health Check
+        self.health_check()
+        print("Welcome to The Farmer's Market!")
         output(self.products())
+        output(self.specials())
+        self.new_cart()
         output(self.commands())
         while True:
             print('>>>', end=' ')
@@ -44,26 +51,26 @@ class Client:
         elif command == 'new':
             # clear the cart
             self.new_cart()
-            return ('Created a new cart', self.current_cart())
+            return self.current_cart()
         elif command == 'invoice':
             # toggle detailed invoice mode
             return self.current_cart(invoice=True)
         elif command == 'products':
             # show the product table
             return self.products()
+        elif command == 'specials':
+            return self.specials()
         elif command == '':
-            return self.show_commands()
+            return self.commands()
         else:
             # presume one or more items to add
             self.add_item(command)
-            return ('Updated cart', self.current_cart())
+            return self.current_cart()
 
-    def new_cart(self, items=()):
+    def new_cart(self):
         """Empty the current cart by creating a new one"""
-        # TODO: Post cart + items
-        r = requests.post('/'.join((self.service_url, 'cart', )), data=json.dumps(items))
-        # TODO: Store cart ID
-        self.cart_id = json.loads(r.json())['id']
+        r = requests.post(self.service_url + '/carts')
+        self.cart_id = r.json()['cart']['id']
 
     def current_cart(self, invoice=False):
         """
@@ -71,34 +78,117 @@ class Client:
         :param invoice: Show the itemized register invoice
         :return: string
         """
-        url = '/'.join((self.service_url, 'cart', self.cart_id))
-        if invoice:
-            url = '/'.join((url, 'invoice'))
-        r = requests.get(
-            url,
-            params={'invoice': invoice}
-        )
-        result = json.loads(r.json())
-        return result
+        width = 35
+
+        def get_data():
+            url = self.service_url + '/cart/' + self.cart_id
+            if invoice:
+                url += '/invoice'
+
+            # Setup a small retry loop for a smooth client experience with remote systems
+            for _ in range(3):
+                r = requests.get(url)
+                if r.status_code == 200:
+                    return r
+                break
+            return None
+
+        def gen_output(resp):
+            if invoice:
+                cart_output = [
+                    '{0}{1}'.format('Item'.ljust(width//2, ' '),
+                                    'Price'.rjust(width//2, ' ')),
+                    '{0}{1}'.format('----'.ljust(width//2, ' '),
+                                    '-----'.rjust(width//2, ' '))
+                ]
+                for (product_code, details) in (resp.json()['invoice']['items']) if resp else ():
+                    cart_output.append('{0}{1}'.format(product_code.ljust(width//2, ' '),
+                                                       ('{:,.2f}'.format(details['price'])).rjust(width//2, ' ')))
+                    for (sp_code, d) in sorted([(sp_code, sp) for sp_code, sp in details['specials'].items()],
+                                               key=lambda r: r[1]['change']):
+                        cart_output.append(
+                            '{0}{1}'.format(sp_code.rjust(width//2, ' '),
+                                            '{:,.2f}'.format(-d['reduction']).rjust(width//2, ' ')))
+                if resp:
+                    total = resp.json()['invoice']['total']
+                else:
+                    total = 0.0
+                cart_output.extend([
+                    ''.rjust(width, '-'),
+                    '{:,.2f}'.format(total).rjust(width, ' ')
+                ])
+                return cart_output
+
+            cart_output = [
+                'Basket: ' + ', '.join(resp.json()['cart']['items']),
+                'Total: ${:,.2f}'.format(resp.json()['total']),
+            ]
+            return cart_output
+
+        resp = get_data()
+        if None:
+            output = ['Service failure: please try again']
+        else:
+            output = gen_output(resp)
+        return output
 
     def add_item(self, input_str):
         """Add items to the cart"""
-        if input_str is None or input_str == '':
-            return
 
-        items = input_str.split(',')
-        print(input_str, "->", items)
-
-        if self.cart_id is None:
-            self.new_cart(items=items)
-        else:
-            requests.put('/'.join((self.service_url, 'cart')), data=json.dumps(items))
+        items = defaultdict(int)
+        for x in input_str.replace(' ', '').split(','):
+            items[x] += 1
+        requests.post(self.service_url + '/cart/' +
+                      self.cart_id, data=json.dumps(dict(add=items)))
 
     def products(self):
         """Return the products table"""
-        r = requests.get('/'.join((self.service_url, 'products')))
-        products = json.loads(r.json)
-        return '\n'.join(line.center(max(map(len, products))) for line in products)
+        r = requests.get(self.service_url + '/products')
+        if r.status_code != 200:
+            products = []
+        else:
+            products = r.json()['products']
+        product_output = [
+            '+--------------|--------------|---------+',
+            '| Product Code |     Name     |  Price  |',
+            '+--------------|--------------|---------+',
+        ]
+        product_output.extend(['|{0: ^14}|{1: ^14}|{2: ^8}|'.format(
+            line['code'], line['name'], '${:,.2f}'.format(line['price'])) for line in products])
+        product_output.append('+--------------|--------------|---------+')
+        return product_output
+
+    def specials(self):
+        # TODO: Dynamic rendering of currently available specials from cashier service
+        return [
+            ''.rjust(80, '-'),
+            'Specials:',
+            '-----',
+            '1. BOGO -- Buy-One-Get-One-Free Special on Coffee. (Unlimited)',
+            '2. APPL -- If you buy 3 or more bags of Apples, the price drops to $4.50.',
+            '3. CHMK -- Purchase a box of Chai and get milk free. (Limit 1)',
+            '4. APOM -- Purchase a bag of Oatmeal and get 50% off a bag of Apples',
+            '          '.center(80, '-'),
+            'Any doubly-applied specials are applied in increasing order of discount!',
+            ''.rjust(80, '-'),
+        ]
+
+    def health_check(self):
+        """Checks the health of the services on which this client depends"""
+        print('Connecting with market service.', end='')
+        while True:
+            try:
+                r = requests.get(self.service_url + '/health-check')
+                if r.status_code != 200:
+                    print('.', end='')
+                    time.sleep(3)
+                    continue
+            except requests.exceptions.ConnectionError:
+                print('.', end='')
+                time.sleep(3)
+                continue
+            break
+        print('. Ready!')
 
 
 # Signal for communicating to the application loop
