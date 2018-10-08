@@ -17,9 +17,9 @@ def test_store_get():
     print(result)
     assert 'cart' in result, 'Expected "cart" in result from store'
     assert 'id' in result, 'Expected "cart" in result from store'
-    ap1 = [x for x in result['cart'] if x == 'AP1']
+    ap1 = [x for x in result['items'] if x == 'AP1']
     ap1_count = len(ap1)
-    ch1 = [x for x in result['cart'] if x == 'CH1']
+    ch1 = [x for x in result['items'] if x == 'CH1']
     ch1_count = len(ch1)
     assert ap1_count == 3, 'Expected 3 AP1, but got {0} - {1}'.format(
         ap1_count, ap1)

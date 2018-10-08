@@ -1,8 +1,8 @@
 import os
 
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify, request
 from flask_sqlalchemy import SQLAlchemy
-
+from sqlalchemy.exc import OperationalError
 
 products = Flask(__name__)
 products.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
@@ -48,16 +48,16 @@ def create_product():
 
 @products.route('/products', methods=['GET'])
 def get_products():
-    return jsonify([x.to_dict() for x in Product.query.all()])
+    return (jsonify([x.to_dict() for x in Product.query.all()]), 200)
 
 
-@products.route('/product/<code>', methods=['GET'])
-def get_product(code):
-    return jsonify(Product.query.filter_by(code=code).first().to_dict())
-
-
-@products.route('/product/<id>', methods=['DELETE'])
-def delete_product(id):
-    p = Product.query.filter_by(id=id)
-    p.active = False
-    return ('', 204)
+@products.route('/health-check', methods=['GET'])
+def health_check():
+    try:
+        print('Connection to Products DB: FAIL')
+        db.engine.execute('SELECT 1')
+    except OperationalError:
+        print('Connection to Products DB: FAIL')
+        return ('', 503)
+    print('Connection to Products DB: OK')
+    return ('', 200)

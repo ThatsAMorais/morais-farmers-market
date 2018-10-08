@@ -31,5 +31,4 @@ badge = """
 if __name__ == '__main__':
     print(badge)
     API(port=os.getenv("MARKET_CARTS_PORT", "15010"),
-        store=Store(host=os.getenv('CART_STORE_HOST', 'cart-store')),
-        cashier_host='http://{0}'.format(os.getenv('CASHIER_SERVICE_HOST'))).start()
+        store=Store(host=os.getenv('CART_STORE_HOST', 'cart-store'))).start()

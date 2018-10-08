@@ -1,5 +1,6 @@
 version: "3"
 services:
+
   client:
     build:
       context: ./
@@ -11,15 +12,7 @@ services:
       - market-api
       - products-seed
       - specials-seed
-  client-tests:
-    image: "morais/farmers-market-client:latest"
-    command: ["python", "-m", "pytest"]
-    environment:
-      MARKET_SERVICE_HOST: http://market-api:${MARKET_GATEWAY_PORT}
-    depends_on:
-      - market-api
-      - products-seed
-      - specials-seed
+
   market-api:
     build:
       context: ./
@@ -34,17 +27,7 @@ services:
       - products
       - carts
       - cashier
-  market-api-tests:
-    image: "morais/farmers-market-api:latest"
-    command: ["python", "-m", "pytest"]
-    environment:
-      CART_SERVICE_HOST: http://carts:${MARKET_CARTS_PORT}
-      PRODUCT_SERVICE_HOST: http://products:${MARKET_PRODUCTS_PORT}
-      CASHIER_SERVICE_HOST: http://cashier:${MARKET_CASHIER_PORT}
-    depends_on:
-      - products
-      - carts
-      - cashier
+  
   products:
     build:
       context: ./
@@ -52,14 +35,6 @@ services:
     image: morais/farmers-market-products:latest
     environment:
       MARKET_PRODUCTS_PORT: ${MARKET_PRODUCTS_PORT}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      PRODUCT_DB_HOST: productdb
-    depends_on:
-      - productdb
-  products-tests:
-    image: "morais/farmers-market-products:latest"
-    command: ["python", "-m", "pytest"]
-    environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       PRODUCT_DB_HOST: productdb
     depends_on:
@@ -84,6 +59,7 @@ services:
       - 3306:3306
     volumes:
       - db-data:/data/db
+
   carts:
     build:
       context: ./
@@ -92,24 +68,9 @@ services:
     environment:
       MARKET_CARTS_PORT: "${MARKET_CARTS_PORT}"
       CART_STORE_HOST: cart-store
-      CASHIER_SERVICE_HOST: http://cashier:${MARKET_CASHIER_PORT}
     depends_on:
       - cart-store
-      - cashier
-  carts-tests:
-    image: "morais/farmers-market-carts:latest"
-    command: ["python", "-m", "pytest"]
-    environment:
-      MARKET_CARTS_PORT: ${MARKET_CARTS_PORT}
-      CART_STORE_HOST: cart-store
-      PRODUCT_SERVICE_HOST: http://products:${MARKET_PRODUCTS_PORT}
-      CASHIER_SERVICE_HOST: http://cashier:${MARKET_CASHIER_PORT}
-    depends_on:
-      - products-seed
-      - cart-store
-      - cashier
-  cart-store:
-    image: "redis:alpine"
+
   cashier:
     build:
       context: ./
@@ -122,17 +83,7 @@ services:
     depends_on:
       - doc-store
       - products
-  cashier-tests:
-    image: "morais/farmers-market-cashier:latest"
-    command: ["python", "-m", "pytest"]
-    environment:
-      DOC_STORE_HOST: doc-store
-      PRODUCT_SERVICE_HOST: http://products:${MARKET_PRODUCTS_PORT}
-    depends_on:
-      - products-seed
-      - specials-seed
-      - doc-store
-      - products
+
   specials-seed:
     image: "morais/farmers-market-cashier:latest"
     command: ["python", "seed.py"]
@@ -140,6 +91,7 @@ services:
       DOC_STORE_HOST: doc-store
     depends_on:
       - doc-store
+
   doc-store:
     image: mongo:latest
     environment:
@@ -152,6 +104,62 @@ services:
       - doc-data:/data/db
     ports:
       - 32001:27017
+
+  cashier-tests:
+    image: "morais/farmers-market-cashier:latest"
+    command: ["python", "-m", "pytest"]
+    environment:
+      DOC_STORE_HOST: doc-store
+      PRODUCT_SERVICE_HOST: http://products:${MARKET_PRODUCTS_PORT}
+    depends_on:
+      - products-seed
+      - specials-seed
+      - doc-store
+      - products
+      
+  client-tests:
+    image: "morais/farmers-market-client:latest"
+    command: ["python", "-m", "pytest"]
+    environment:
+      MARKET_SERVICE_HOST: http://market-api:${MARKET_GATEWAY_PORT}
+    depends_on:
+      - market-api
+      - products-seed
+      - specials-seed
+
+  carts-tests:
+    image: "morais/farmers-market-carts:latest"
+    command: ["python", "-m", "pytest"]
+    environment:
+      MARKET_CARTS_PORT: ${MARKET_CARTS_PORT}
+      CART_STORE_HOST: cart-store
+    depends_on:
+      - cart-store
+  cart-store:
+    image: "redis:alpine"
+    
+  market-api-tests:
+    image: "morais/farmers-market-api:latest"
+    command: ["python", "-m", "pytest"]
+    environment:
+      CART_SERVICE_HOST: http://carts:${MARKET_CARTS_PORT}
+      PRODUCT_SERVICE_HOST: http://products:${MARKET_PRODUCTS_PORT}
+      CASHIER_SERVICE_HOST: http://cashier:${MARKET_CASHIER_PORT}
+    depends_on:
+      - products
+      - products-seed
+      - carts
+      - cashier
+      - specials-seed
+
+  products-tests:
+    image: "morais/farmers-market-products:latest"
+    command: ["python", "-m", "pytest"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      PRODUCT_DB_HOST: productdb
+    depends_on:
+      - productdb
 
 volumes:
   db-data:

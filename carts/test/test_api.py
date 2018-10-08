@@ -3,6 +3,7 @@ Verify behavior of the API
 """
 import json
 import os
+import time
 
 from flask_testing import TestCase
 
@@ -12,20 +13,24 @@ from store.redis_store import Store
 # TODO: Better isolation from the other services, but using docker-compose is fine for now
 
 
-class MyTest(TestCase):
+class APITest(TestCase):
 
     def create_app(self):
         self.api = API(port=os.getenv("MARKET_CARTS_PORT", "15010"),
                        store=Store(host=os.getenv(
-                           'CART_STORE_HOST', 'cart-store')),
-                       cashier_host=os.getenv('CASHIER_SERVICE_HOST'))
+                           'CART_STORE_HOST', 'cart-store')))
         app = self.api.api
         app.config['TESTING'] = True
         return app
 
     def setUp(self):
-        self.product_service_host = self.api.products_service
         self.client = self.api.api.test_client()
+        # health check
+        for _ in range(3):
+            r = self.client.get('/health-check')
+            if r.status_code == 200:
+                break
+            time.sleep(3)
 
     def tearDown(self):
         pass
@@ -39,9 +44,9 @@ class MyTest(TestCase):
             }
         }))
         assert r.status_code == 201
-        ap1 = [x for x in r.json['cart'] if x == 'AP1']
+        ap1 = [x for x in r.json['items'] if x == 'AP1']
         ap1_count = len(ap1)
-        ch1 = [x for x in r.json['cart'] if x == 'CH1']
+        ch1 = [x for x in r.json['items'] if x == 'CH1']
         ch1_count = len(ch1)
         assert ap1_count == 4, 'Expected 3 AP1, but got {0} - {1}'.format(
             ap1_count, ap1)
@@ -65,9 +70,9 @@ class MyTest(TestCase):
             }
         }))
         assert r.status_code == 200
-        ap1 = [x for x in r.json['cart'] if x == 'AP1']
+        ap1 = [x for x in r.json['items'] if x == 'AP1']
         ap1_count = len(ap1)
-        ch1 = [x for x in r.json['cart'] if x == 'CH1']
+        ch1 = [x for x in r.json['items'] if x == 'CH1']
         ch1_count = len(ch1)
         assert ap1_count == 3, 'Expected 3 AP1, but got {0} - {1}'.format(
             ap1_count, ap1)

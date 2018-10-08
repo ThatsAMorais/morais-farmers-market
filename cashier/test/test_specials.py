@@ -1,4 +1,5 @@
 import os
+import time
 
 import requests
 
@@ -58,25 +59,37 @@ def test_determine_reduction():
 
 def test_calculate_total():
     """Verify correct results of calculation"""
-    cart = ['OM1', 'OM1', 'AP1', 'AP1', 'AP1',  'CH1', 'MK1', 'CF1', 'CF1']
-    products = [requests.get(
-        '{0}/product/{1}'.format(os.getenv('PRODUCT_SERVICE_HOST'), x)).json() for x in set(cart)]
+    products_service = os.getenv('PRODUCT_SERVICE_HOST')
+    # health check
+    for _ in range(3):
+        r = requests.get(products_service + '/health-check')
+        if r.status_code == 200:
+            break
+        time.sleep(3)
+    products = requests.get('{0}/products'.format(products_service)).json()
     price = dict((p['code'], float(p['price'])) for p in products)
     items = [
-        ('AP1', dict(price=price['AP1'], specials=dict(APOM=0.5, APPL=0.25))),
-        ('AP1', dict(price=price['AP1'], specials=dict(APOM=0.5, APPL=0.25))),
-        ('AP1', dict(price=price['AP1'], specials=dict(APPL=0.25, ))),
+        ('AP1', dict(price=price['AP1'],
+                     specials=dict(APOM=dict(change=0.5, reduction=0), APPL=dict(change=0.25, reduction=0)))),
+        ('AP1', dict(price=price['AP1'],
+                     specials=dict(APOM=dict(change=0.5, reduction=0), APPL=dict(change=0.25, reduction=0)))),
+        ('AP1', dict(price=price['AP1'], specials=dict(
+            APPL=dict(change=0.25, reduction=0)))),
         ('CH1', dict(price=price['CH1'], specials=dict())),
-        ('MK1', dict(price=price['MK1'], specials=dict(CHMK=1.0, ))),
+        ('MK1', dict(price=price['MK1'], specials=dict(
+            CHMK=dict(change=1.0, reduction=0)))),
         ('OM1', dict(price=price['OM1'], specials=dict())),
         ('OM1', dict(price=price['OM1'], specials=dict())),
-        ('CF1', dict(price=price['CF1'], specials=dict(BOGO=1.0, ))),
+        ('CF1', dict(price=price['CF1'], specials=dict(
+            BOGO=dict(change=1.0, reduction=0)))),
         ('CF1', dict(price=price['CF1'], specials=dict())),
     ]
     intermediate = specials.calculate_reduction(0.25, price['AP1'])
     expected_total = sum([
-        price['AP1'] - intermediate - specials.calculate_reduction(0.5, price['AP1'] - intermediate),
-        price['AP1'] - intermediate - specials.calculate_reduction(0.5, price['AP1'] - intermediate),
+        price['AP1'] - intermediate -
+        specials.calculate_reduction(0.5, price['AP1'] - intermediate),
+        price['AP1'] - intermediate -
+        specials.calculate_reduction(0.5, price['AP1'] - intermediate),
         price['AP1'] - specials.calculate_reduction(0.25, price['AP1']),
         price['CH1'],
         price['MK1'] - specials.calculate_reduction(1.0, price['MK1']),
@@ -86,5 +99,5 @@ def test_calculate_total():
         price['CF1'],
 
     ])
-    result = specials.calculate_total(items)
-    assert result == expected_total
+    total, _ = specials.calculate_total(items)
+    assert total == expected_total

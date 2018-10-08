@@ -1,6 +1,7 @@
 
 import os
-from app.api import app
+
+from app.api import API
 
 
 badge = """
@@ -19,6 +20,10 @@ badge = """
                    GATEWAY API
 """
 
+
 if __name__ == '__main__':
     print(badge)
-    app.run(debug=True, host='0.0.0.0', port=os.getenv("MARKET_GATEWAY_PORT", "15000"))
+    API(port=os.getenv("MARKET_GATEWAY_PORT", "15000"),
+        products_service_host=os.getenv('PRODUCT_SERVICE_HOST'),
+        carts_service_host=os.getenv('CART_SERVICE_HOST'),
+        cashier_service_host=os.getenv('CASHIER_SERVICE_HOST')).start()

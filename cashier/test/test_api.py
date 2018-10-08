@@ -2,11 +2,11 @@
 Verify behavior of the API
 """
 import os
+import time
 
 from flask_testing import TestCase
 
 from app.cashier import API
-
 
 # TODO: Better isolation from the other services, but using docker-compose is fine for now
 
@@ -22,8 +22,13 @@ class MyTest(TestCase):
         return app
 
     def setUp(self):
-        self.products_service = self.api.products_service
         self.client = self.api.api.test_client()
+        # health check
+        for _ in range(3):
+            r = self.client.get('/health-check')
+            if r.status_code == 200:
+                break
+            time.sleep(5)
 
     def tearDown(self):
         pass

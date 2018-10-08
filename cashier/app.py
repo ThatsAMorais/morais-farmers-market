@@ -45,4 +45,4 @@ if __name__ == '__main__':
     print(badge)
     API(port=os.getenv("MARKET_CASHIER_PORT", "15100"),
         mongo_host=os.getenv('DOC_STORE_HOST', 'doc-store'),
-        products_host='http://{0}'.format(os.getenv('PRODUCT_SERVICE_HOST'))).start()
+        products_host='{0}'.format(os.getenv('PRODUCT_SERVICE_HOST'))).start()

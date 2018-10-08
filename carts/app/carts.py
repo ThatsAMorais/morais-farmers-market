@@ -1,17 +1,15 @@
 
 import json
 
-import requests
 from flask import Flask, jsonify, request
 
 
 class API:
 
-    def __init__(self, port, store, cashier_host):
+    def __init__(self, port, store):
 
         self.port = port
         self.store = store
-        self.cashier_service = cashier_host
         self.api = carts = Flask(__name__)
 
         @carts.route('/carts', methods=['POST'])
@@ -59,15 +57,12 @@ class API:
             self.store.delete_cart()
             ('', 204)
 
-        @carts.route('/cart/<id>/invoice', methods=['GET'])
-        def get_cart_invoice(id):
-            """Pull data from other services to calculate cart total"""
-            invoice = self.store.get_invoice(id)
-            if invoice is None:
-                invoice = request.get()
-                self.store.set_invoice(id, invoice)
-            return (jsonify(dict(id=id, invoice=invoice)),
-                    200)
+        @carts.route('/health-check', methods=['GET'])
+        def health_check():
+            """Check health of dependencies"""
+            if not self.store.health_check():
+                return ('Service Unavailable', 503)
+            return ('', 200)
 
     def start(self):
         self.api.run(debug=True, host='0.0.0.0', port=self.port)

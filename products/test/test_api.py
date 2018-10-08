@@ -1,6 +1,8 @@
 """
 Verify behavior of the Products service
 """
+import time
+
 from flask_testing import TestCase
 
 from app.products import db, products
@@ -15,22 +17,17 @@ class APITest(TestCase):
 
     def setUp(self):
         self.client = products.test_client()
+        # health check
+        for _ in range(3):
+            r = self.client.get('/health-check')
+            if r.status_code == 200:
+                break
+            time.sleep(3)
         db.create_all()
 
     def tearDown(self):
         db.session.remove()
         db.drop_all()
-
-    def test_get_product(self):
-        r = self.client.post('products', data=dict(
-            code='code',
-            name='name',
-            price='1.0',
-        ))
-        assert r.status_code == 201, 'Expected 201 from POST but got {0}'.format(r.status_code)
-
-        r = self.client.get('product/'+r.json['id'])
-        assert r.status_code == 200
 
     def test_get_products(self):
         for n in range(3):
@@ -44,6 +41,7 @@ class APITest(TestCase):
 
         r = self.client.get('products')
         assert r.status_code == 200
-        assert len(r.json) == 3, "Expected 3 products but got {0}".format(len(r.json))
+        assert len(r.json) == 3, "Expected 3 products but got {0}".format(
+            len(r.json))
         for f in ['id', 'code', 'name', 'price', 'active']:
             assert f in r.json[0]
