@@ -1,30 +1,85 @@
 # Morais Farmer's Market
 
+```text
+ #######                  #######                                    ###
+    #    #    # ######    #         ##   #####  #    # ###### #####  ###  ####
+    #    #    # #         #        #  #  #    # ##  ## #      #    #  #  #
+    #    ###### #####     #####   #    # #    # # ## # #####  #    # #    ####
+    #    #    # #         #       ###### #####  #    # #      #####           #
+    #    #    # #         #       #    # #   #  #    # #      #   #      #    #
+    #    #    # ######    #       #    # #    # #    # ###### #    #      ####
+
+        #     #
+        ##   ##   ##   #####  #    # ###### #####
+        # # # #  #  #  #    # #   #  #        #
+        #  #  # #    # #    # ####   #####    #
+        #     # ###### #####  #  #   #        #
+        #     # #    # #   #  #   #  #        #
+        #     # #    # #    # #    # ######   #  
+```
+
 A marketplace application to showcase items available for purchase at the farmer's market.
+
+## System Overview
+
+```pretty drawings
+  |-----------|        |-------------|       |-------------|      |---------------|
+  | Client(s) | ---->  | Gateway API | ----> | Product Svc |----> | Products (DB) |
+  |-----------|        |-------------|       |-------------|      |---------------|
+                           |                       ^
+                           |                       |
+                           |                 |-------------|      |-----------------------|
+                           |---------------> | Cashier Svc |----> |  Specials (Documents) |
+                           |                 |-------------|      |-----------------------|
+                           |                       |
+                           |                       v
+                           |                 |-----------|        |---------------|
+                           |---------------> | Carts Svc |------> | Carts (Cache) |
+                           |                 |-----------|        |---------------|
+```
+
+See `design.md` for a peek behind the curtain into my implementation decisions.
 
 ## How to Run
 
 ----
-This application depends on Docker, so I will assume it is already installed, and that this repo has been cloned.
+This application depends on Docker, so I will assume it is already installed, and that this repository has been cloned.
 
-### Run as a CLI
+**Warning: the `docker-compose build` for this project will take around 10 or 15 minutes**.
 
-The CLI provides an input interface for creating carts and producing itemized results.
+### Run the CLI **(Shortest path to testing this application)**
 
-> `docker-compose up market-cli`
+The CLI provides an input interface for creating carts and producing itemized results, much like a test client.
+
+> `docker-compose build client`
+
+then
+
+> `docker-compose run client`
+
+will provide a command prompt with which to interact with the API, i.e. ...
 
 ```text
-TODO
+Commands:
+   action : description
+   ....
+
+>>> CH1, AP1
 ```
 
-### Run as a Service
+### Run the API standalone
 
-> `docker-compose up api`
-
- todo: show how to use curl to test against the API
+> `docker-compose up market-api`
 
 ### Run Tests
 
-Tests may be executed using docker-compose
+Tests may be executed using docker-compose, as well.
 
-> `docker-compose up --build tests`
+Client tests:
+> `docker-compose up --build <service-name>-tests`
+
+## Viewing Logs
+
+Often useful is the ability to see how each service is behaving...
+
+> `docker-compose logs <service-name>`
